@@ -1,0 +1,16 @@
+:root{
+  --bg: #0b1020;
+  --fg: #e6eef8;
+  --accent: #ff4d4f;
+}
+
+html,body,#root{
+  height:100%;
+  margin:0;
+}
+body{
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg,#071025 0%, #081428 100%);
+  color:var(--fg);
+}
+.app h1{margin:0 0 .5rem}
