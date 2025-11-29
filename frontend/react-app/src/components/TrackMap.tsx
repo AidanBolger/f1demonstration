@@ -1,12 +1,20 @@
 import React, { useMemo } from 'react'
-import { MapContainer, Marker, useMap, CircleMarker, GeoJSON, Tooltip, Polyline } from 'react-leaflet'
+import { MapContainer, useMap, CircleMarker, GeoJSON, Tooltip, Polyline } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 // load precomputed transform (written by scripts/compute_transform.js)
 import cornerTransform from '../data/corner_transform.json'
-// telemetry (driver lap) file
-import telJson from '../25_tel.json'
+// telemetry (driver lap) files are in `src/data/laps` (loaded dynamically)
+import driversData from '../data/drivers.json'
 import './TrackMap.css'
+
+// Explicit per-driver lap importers so we only load when user selects a driver.
+// This avoids Vite complaining about template dynamic imports while still not preloading other laps.
+const lapImporters: Record<string, () => Promise<any>> = {
+  VER: () => import('../data/laps/VER.json'),
+  HAM: () => import('../data/laps/HAM.json'),
+  PIA: () => import('../data/laps/PIA.json'),
+}
 
 // default padding used for fitBounds (tight)
 const DEFAULT_PADDING: [number, number] = [10, 10]
@@ -120,8 +128,37 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return mappedCorners as DisplayCorner[]
     }, [precomputedMappedCorners, mappedCorners])
 
-    // --- Telemetry: load telemetry JSON (driver lap) and map to lat/lon using same precomputed transform ---
-    const telemetry = telJson && telJson.tel ? telJson.tel : null
+    // --- Telemetry: support dynamic lap selection ---
+    const [selectedDriverCode, setSelectedDriverCode] = React.useState<string>('VER')
+    const [lapFilename, setLapFilename] = React.useState<string>('VER.json')
+    const [telemetryModule, setTelemetryModule] = React.useState<any | null>(null)
+    const telemetry = telemetryModule && telemetryModule.tel ? telemetryModule.tel : null
+
+    // Build a simple driver object for display/use in this component.
+    const driversList: any[] = (driversData && (driversData as any).drivers) ? (driversData as any).drivers : []
+    const matched = driversList.find(d => d.driver === selectedDriverCode) || driversList[0] || { driver: 'VER', team: 'Red Bull Racing', color: '#1E22AA' }
+    const driver = { name: matched.driver, team: matched.team, color: matched.color }
+
+    // When a driver is selected, load that driver's lap via the explicit importer map.
+    React.useEffect(() => {
+      let cancelled = false
+      const filename = `${selectedDriverCode}.json`
+      setLapFilename(filename)
+      const importer = (lapImporters as any)[selectedDriverCode]
+      if (!importer) {
+        console.warn('No importer for driver', selectedDriverCode)
+        setTelemetryModule(null)
+        return
+      }
+      importer().then((mod: any) => {
+        if (cancelled) return
+        setTelemetryModule((mod && (mod as any).default) ? (mod as any).default : mod)
+      }).catch((err: any) => {
+        console.warn('Failed to import lap for', selectedDriverCode, err)
+        if (!cancelled) setTelemetryModule(null)
+      })
+      return () => { cancelled = true }
+    }, [selectedDriverCode])
 
     const telemetryLatLngs = useMemo(() => {
       if (!telemetry || !telemetry.x || !telemetry.y) return [] as [number, number][]
@@ -160,38 +197,105 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
     const [playing, setPlaying] = React.useState(false)
     const [speed, setSpeed] = React.useState(1) // 1x
 
-    // helper: binary search for time -> index
-    const findIndexByTime = React.useCallback((tgt: number) => {
+    // Refs for high-performance animation (avoid stale closures)
+    const markerRef = React.useRef<L.Marker | null>(null)
+    const playStartWallRef = React.useRef<number | null>(null)
+    const playStartTelRef = React.useRef<number | null>(null)
+    const speedRef = React.useRef<number>(speed)
+    speedRef.current = speed
+
+    // helper: find segment index i where times[i] <= t <= times[i+1]
+    const findSegmentIndex = React.useCallback((t: number) => {
       if (!telemetry || !telemetry.time) return 0
-      const arr: number[] = telemetry.time
-      let lo = 0, hi = arr.length - 1
+      const arr = telemetry.time
+      const n = arr.length
+      if (n === 0) return 0
+      if (t <= arr[0]) return 0
+      if (t >= arr[n - 1]) return Math.max(0, n - 2)
+      let lo = 0, hi = n - 1
       while (lo <= hi) {
         const mid = Math.floor((lo + hi) / 2)
-        if (arr[mid] < tgt) lo = mid + 1
+        if (arr[mid] <= t && t <= arr[mid + 1]) return mid
+        if (arr[mid] < t) lo = mid + 1
         else hi = mid - 1
       }
-      return Math.max(0, Math.min(arr.length - 1, lo))
+      return Math.max(0, Math.min(n - 2, lo - 1))
     }, [telemetry])
 
-    // playback effect: when playing, update currentIndex based on wall clock and telemetry time
+    // create a raw Leaflet marker once when map and telemetry are ready
     React.useEffect(() => {
-      if (!playing || !telemetry || !telemetry.time) return
+      const map = mapRef.current
+      if (!map || !telemetryLatLngs || telemetryLatLngs.length === 0) return
+      // ensure we have a Leaflet map instance
+      try {
+        if (!markerRef.current) {
+          const latlng = telemetryLatLngs[currentIndex]
+          markerRef.current = L.marker([latlng[0], latlng[1]], { interactive: false }).addTo(map)
+        } else {
+          const latlng = telemetryLatLngs[currentIndex]
+          markerRef.current.setLatLng([latlng[0], latlng[1]])
+        }
+      } catch (e) {
+        // ignore
+      }
+      return () => {
+        if (markerRef.current) {
+          try { markerRef.current.remove() } catch (e) {}
+          markerRef.current = null
+        }
+      }
+    }, [mapRef.current, telemetryLatLngs, currentIndex])
+
+    // main RAF loop: update marker position by telemetry time interpolation
+    React.useEffect(() => {
+      if (!telemetry || !telemetry.time || telemetry.time.length === 0) return
       let rafId: number | null = null
-      let startWall = performance.now()
-      const startIndex = currentIndex
-      const startTelTime = telemetry.time[startIndex] || 0
 
       const step = () => {
-        const elapsedMs = performance.now() - startWall
-        const elapsedSec = (elapsedMs / 1000) * speed
-        const targetTime = startTelTime + elapsedSec
-        const idx = findIndexByTime(targetTime)
-        setCurrentIndex(idx)
+        if (!playing) return
+        const startWall = playStartWallRef.current ?? performance.now()
+        const startTel = playStartTelRef.current ?? telemetry.time[currentIndex] ?? 0
+        const elapsedSec = (performance.now() - startWall) / 1000
+        const targetTime = startTel + elapsedSec * (speedRef.current || 1)
+
+        // clamp to telemetry range
+        const times = telemetry.time
+        const lastTime = times[times.length - 1]
+        const t = Math.max(times[0], Math.min(lastTime, targetTime))
+
+        const i = findSegmentIndex(t)
+        const t0 = times[i]
+        const t1 = times[i + 1] ?? t0
+        const alpha = t1 === t0 ? 0 : (t - t0) / (t1 - t0)
+
+        const p0 = telemetryLatLngs[i]
+        const p1 = telemetryLatLngs[i + 1] ?? p0
+        const lat = p0[0] + alpha * (p1[0] - p0[0])
+        const lon = p0[1] + alpha * (p1[1] - p0[1])
+
+        // update raw Leaflet marker
+        if (markerRef.current) markerRef.current.setLatLng([lat, lon])
+
+        // update HUD index occasionally (setState every frame is acceptable but keep it minimal)
+        const approxIndex = Math.round(i + alpha)
+        setCurrentIndex(Math.max(0, Math.min(telemetry.time.length - 1, approxIndex)))
+
         rafId = requestAnimationFrame(step)
       }
-      rafId = requestAnimationFrame(step)
+
+      if (playing) {
+        // initialize play anchors
+        playStartWallRef.current = playStartWallRef.current ?? performance.now()
+        playStartTelRef.current = playStartTelRef.current ?? (telemetry.time[currentIndex] ?? 0)
+        rafId = requestAnimationFrame(step)
+      } else {
+        // clear anchors so resume will rebase
+        playStartWallRef.current = null
+        playStartTelRef.current = null
+      }
+
       return () => { if (rafId) cancelAnimationFrame(rafId) }
-    }, [playing, telemetry, speed, findIndexByTime])
+    }, [playing, telemetry, telemetryLatLngs, currentIndex, findSegmentIndex])
 
     // helper to round displayed telemetry values to whole numbers
     const roundDisplay = (v: any) => {
@@ -214,7 +318,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return Math.round(p)
     }
 
-    // format distance (assumed meters) to kilometers with two decimals (e.g., 1.23 km)
+    // format distance to kilometers with two decimals
     const formatKm = (v: any): string => {
       if (v === null || v === undefined) return '-'
       const n = Number(v)
@@ -231,6 +335,12 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return n.toFixed(3) + 's'
     }
 
+    // percent (0-100) for the current position of the time range slider
+    const rangePercent = React.useMemo(() => {
+      if (!telemetry || !telemetry.time || telemetry.time.length <= 1) return 0
+      return Math.round((currentIndex / Math.max(1, telemetry.time.length - 1)) * 100)
+    }, [telemetry, currentIndex])
+
 
   return (
     <div className="tm-container">
@@ -246,21 +356,18 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
             className="tm-map"
           >
             <FitBoundsGeo coords={highResGeo.features[0].geometry.coordinates as [number, number][]} />
-            <GeoJSON data={highResGeo} style={{ color: '#2b7ae4', weight: 4, opacity: 0.95 }} />
+            <GeoJSON data={highResGeo} style={{ color: '#ffffffff', weight: 6, opacity: 0.95 }} />
 
             {/* telemetry polyline */}
             {telemetryLatLngs && telemetryLatLngs.length > 0 && (
-              <Polyline positions={telemetryLatLngs.map(p => [p[0], p[1]])} pathOptions={{ color: '#ffb400', weight: 3, opacity: 0.9 }} />
+              <Polyline positions={telemetryLatLngs.map(p => [p[0], p[1]])} pathOptions={{ color: driver?.color || '#ffb400', weight: 3, opacity: 0.9 }} />
             )}
 
-            {/* playback marker */}
-            {telemetryLatLngs && telemetryLatLngs.length > 0 && telemetryLatLngs[currentIndex] && (
-              <Marker position={telemetryLatLngs[currentIndex] as any} />
-            )}
+            {/* playback marker is handled by a single raw Leaflet L.marker (markerRef) to avoid re-render jitter */}
 
             {/* plotted corner circles (precomputed transform, or bbox fallback) */}
             {displayCorners.map((c, i) => (
-              <CircleMarker key={i} center={[c.lat, c.lon]} radius={6} pathOptions={{ color: '#d33', fillColor: '#d33' }}>
+              <CircleMarker key={i} center={[c.lat, c.lon]} radius={5} pathOptions={{ color: '#d33', fillColor: '#d33' }}>
                 <Tooltip>{c.num ?? `#${c.idx}`}</Tooltip>
               </CircleMarker>
             ))}
@@ -271,17 +378,37 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
 
       {/* Right column: controls / info */}
       <div className="tm-controls">
-        <div className="tm-controls-title">Track Controls</div>
-        <div className="tm-controls-desc">Use this panel for playback controls, toggles, or telemetry info.</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div className="tm-controls-title">Track Controls</div>
+          <div className="tm-driver-chip">
+            <div className="tm-driver-label">Driver</div>
+            <div className="tm-driver-swatch" style={{ background: driver?.color || '#ccc' }} />
+            <div className="tm-driver-select-wrap">
+              <select
+                className="tm-driver-select"
+                value={selectedDriverCode}
+                onChange={e => setSelectedDriverCode(e.target.value)}
+                style={{ color: driver?.color || undefined }}
+              >
+                {driversList.map(d => (
+                  <option key={d.driver} value={d.driver} style={{ color: d.color || undefined }}>{d.driver} — {d.team}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
 
         {/* Telemetry controls */}
-        {telemetry && telemetry.time && (
-          <div style={{ marginTop: 6 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <button onClick={() => setPlaying(p => !p)} className="tm-play-button">{playing ? 'Pause' : 'Play'}</button>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <label style={{ fontSize: 12 }}>Speed</label>
-                <select value={speed} onChange={e => setSpeed(Number(e.target.value))}>
+        <div style={{ marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            {/* driver selector moved to header */}
+
+
+            <button onClick={() => setPlaying(p => !p)} className="tm-play-button">{playing ? 'Pause' : 'Play'}</button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <label style={{ fontSize: 15 }}>Speed</label>
+              <div className="tm-driver-select-wrap">
+                <select className="tm-driver-select" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
                   <option value={0.25}>0.25x</option>
                   <option value={0.5}>0.5x</option>
                   <option value={1}>1x</option>
@@ -290,7 +417,9 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
                 </select>
               </div>
             </div>
+          </div>
 
+            {telemetry && telemetry.time && (
             <input
               type="range"
               min={0}
@@ -298,13 +427,14 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
               value={currentIndex}
               onChange={e => { setCurrentIndex(Number(e.target.value)); setPlaying(false) }}
               className="tm-range"
+              style={{
+                background: `linear-gradient(90deg, ${driver?.color || '#3a17ff'} ${rangePercent}%, #eef2f5 ${rangePercent}%)`,
+                accentColor: driver?.color || undefined,
+                ['--driver-color' as any]: driver?.color || '#3a17ff'
+              }}
             />
-
-            <div style={{ fontSize: 12, marginTop: 6 }}>
-              Time: {(telemetry.time[currentIndex] ?? 0).toFixed(3)}s — Index: {currentIndex}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <div style={{ marginTop: 10 }}>
           <button
@@ -328,7 +458,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
 
         {/* Telemetry metrics as individual cards */}
         {telemetry && (
-          <div className="tm-telemetry-wrap">
+          <div className="tm-telemetry-wrap" style={{ ['--driver-color' as any]: driver?.color || '#3a17ff' }}>
             <div className="tm-metrics-row">
               <div className="tm-metric-card">
                 <div className="tm-metric-label">Time</div>
@@ -356,8 +486,8 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
                   {(() => {
                     const pct = formatPercent(telemetry.throttle?.[currentIndex])
                     return (
-                      <div className="tm-bar" title={pct !== null ? `${pct}%` : 'n/a'}>
-                        <div className="tm-bar-fill-throttle" style={{ width: pct !== null ? `${pct}%` : '0%' }} />
+                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
+                        <div className="tm-bar-fill-throttle" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
                         {pct !== null && <div className="tm-bar-label">{pct}%</div>}
                       </div>
                     )
@@ -371,8 +501,8 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
                   {(() => {
                     const pct = formatPercent(telemetry.brake?.[currentIndex])
                     return (
-                      <div className="tm-bar" title={pct !== null ? `${pct}%` : 'n/a'}>
-                        <div className="tm-bar-fill-brake" style={{ width: pct !== null ? `${pct}%` : '0%' }} />
+                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
+                        <div className="tm-bar-fill-brake" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
                         {pct !== null && <div className="tm-bar-label">{pct}%</div>}
                       </div>
                     )
@@ -387,7 +517,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
             </div>
 
             
-            <div className="tm-metric-label">Position (X, Y)</div>
+          <div className="tm-metric-label" style={{ textAlign: 'left' }}>Position (X, Y)</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#3a17ffab" }}>{String(roundDisplay(telemetry.x?.[currentIndex]))}, {String(roundDisplay(telemetry.y?.[currentIndex]))}</div>
             
           </div>

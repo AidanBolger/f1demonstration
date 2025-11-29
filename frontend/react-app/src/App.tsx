@@ -2,7 +2,7 @@ import React from 'react'
 import TrackMap from './components/TrackMap'
 
 // Import corners at build time so Vite bundles the data and the map can render synchronously.
-import cornersData from './corners.json'
+import cornersData from './data/corners.json'
 import caGeo from './data/ca-1978.json'
 
 type Corners = {
