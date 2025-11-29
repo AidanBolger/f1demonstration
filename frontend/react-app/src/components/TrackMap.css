@@ -1,3 +1,65 @@
+.tm-gear-item{font-size:14px;color:var(--driver-color,#3a17ff);opacity:0.35;transition:transform 140ms ease,opacity 140ms ease;padding:4px 6px;border-radius:6px;line-height:1}
+.tm-gear-item.active{opacity:1;font-weight:700;background:rgba(0,0,0,0.04)}
+
+/* Full-width gear box that fits all gears */
+.tm-gear-box{width:calc(120px * 2 + 8px + 40px);display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.04);box-shadow:0 1px 2px rgba(0,0,0,0.04);margin:5px 0;align-self:flex-start;min-height:48px}
+.tm-gear-box-label{font-size:13px;color:#666}
+.tm-gear-row{display:flex;flex:1;justify-content:space-evenly;gap:3px;width:100%}
+.tm-gear-item{flex:0 0 auto;text-align:center;padding:8px 6px}
+.tm-gear-item.active{background:var(--driver-color, #3a17ff);color:#fff;opacity:1;transform:none;box-shadow:0 1px 4px rgba(0,0,0,0.12)}
+.tm-gear-box{
+	/* width ~ two metric cards plus gap */
+	width: calc(120px * 2 + 8px + 20px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 8px;
+	border-radius: 8px;
+	background: #fff;
+	border: 1px solid rgba(0,0,0,0.04);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+	margin: 5px 0;
+	align-self: flex-start;
+	min-height: 48px;
+}
+
+.tm-gear-box-label{
+	font-size:13px;
+	color:#666;
+	width:100%;
+	text-align:center;
+	padding-left:4px;
+	margin:0;
+}
+
+.tm-gear-row{
+	display:flex;
+	flex-wrap:nowrap;
+	justify-content:space-evenly;
+	gap:6px;
+	width:100%;
+}
+
+.tm-gear-item{
+	flex: 0 0 auto;
+	min-width:5px;
+	padding:6px 8px;
+	text-align:center;
+	color:var(--driver-color,#3a17ff);
+	opacity:0.35;
+	transition: opacity 140ms ease, transform 140ms ease;
+	border-radius:6px;
+	line-height:1;
+}
+
+.tm-gear-item.active{
+	opacity:1;
+	color:#fff;
+	background: var(--driver-color, #3a17ff);
+	box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+	transform: none;
+}
 .tm-container{height:65vh;width:100%;background:var(--bg);display:flex;gap:12px}
 .tm-left{width:40%;min-width:320px;height:100%;border-radius: 8px;border-color: #000000;border-width: 2px;border-style: solid;overflow: hidden;}
 .tm-map{height:100%;width:100%;background:var(--bg);border-radius:6px}

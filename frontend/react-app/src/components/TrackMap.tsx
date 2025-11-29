@@ -475,10 +475,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
                 <div className="tm-metric-value">{String(roundDisplay(telemetry.rpm?.[currentIndex]))}</div>
               </div>
 
-              <div className="tm-metric-card">
-                <div className="tm-metric-label">Gear</div>
-                <div className="tm-metric-value">{String(roundDisplay(telemetry.gear?.[currentIndex]))}</div>
-              </div>
+              {/* Gear metric removed from row — rendered as a full gear box below */}
 
               <div className="tm-metric-card">
                 <div className="tm-metric-label">Throttle</div>
@@ -516,10 +513,37 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
               </div>
             </div>
 
-            
-          <div className="tm-metric-label" style={{ textAlign: 'left' }}>Position (X, Y)</div>
+            {/* Gear box: fixed width (~two metric cards) with label above and horizontal gear row */}
+            <div className="tm-gear-box" style={{ ['--driver-color' as any]: driver?.color || '#3a17ff' }}>
+              <div className="tm-gear-box-label">Gear</div>
+              <div className="tm-gear-row" role="list" aria-label="Gear selection">
+                {['N','1','2','3','4','5','6','7','8'].map(g => {
+                  const raw = telemetry.gear?.[currentIndex]
+                  let isActive = false
+                  if (raw === null || raw === undefined) isActive = false
+                  else {
+                    const n = Number(raw)
+                    if (Number.isFinite(n)) {
+                      // treat 0 or negative as Neutral
+                      if (g === 'N') isActive = n <= 0
+                      else isActive = n === Number(g)
+                    } else {
+                      // non-numeric (maybe 'N')
+                      isActive = String(raw).toUpperCase() === g
+                    }
+                  }
+                  return (
+                    <div key={g} className={"tm-gear-item" + (isActive ? ' active' : '')} role="listitem" aria-current={isActive || undefined}>
+                      {g}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="tm-metric-label" style={{ textAlign: 'left' }}>Position (X, Y)</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#3a17ffab" }}>{String(roundDisplay(telemetry.x?.[currentIndex]))}, {String(roundDisplay(telemetry.y?.[currentIndex]))}</div>
-            
+
           </div>
         )}
       </div>
