@@ -1,5 +1,5 @@
 :root{
-  --bg: #0b1020;
+  --bg: #0a0e1a;
   --fg: #e6eef8;
   --accent: #ff4d4f;
 }
@@ -15,3 +15,10 @@ body{
   color:var(--fg);
 }
 .app h1{margin:0 0 .5rem}
+
+/* leave space for fixed navbar */
+.app-main{
+  padding: 16px;
+  /* restore a small visual gap beneath the fixed navbar */
+  padding-top: 112px; /* increased to give extra space below navbar */
+}

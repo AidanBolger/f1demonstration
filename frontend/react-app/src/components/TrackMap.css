@@ -2,21 +2,21 @@
 .tm-gear-item.active{opacity:1;font-weight:700;background:rgba(0,0,0,0.04)}
 
 /* Full-width gear box that fits all gears */
-.tm-gear-box{width:calc(120px * 2 + 8px + 40px);display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.04);box-shadow:0 1px 2px rgba(0,0,0,0.04);margin:5px 0;align-self:flex-start;min-height:48px}
+.tm-gear-box{width:clamp(260px,28vw,340px);display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.04);box-shadow:0 1px 2px rgba(0,0,0,0.04);margin:5px 0;align-self:flex-start;min-height:48px}
 .tm-gear-box-label{font-size:13px;color:#666}
 .tm-gear-row{display:flex;flex:1;justify-content:space-evenly;gap:3px;width:100%}
 .tm-gear-item{flex:0 0 auto;text-align:center;padding:8px 6px}
 .tm-gear-item.active{background:var(--driver-color, #3a17ff);color:#fff;opacity:1;transform:none;box-shadow:0 1px 4px rgba(0,0,0,0.12)}
 .tm-gear-box{
 	/* width ~ two metric cards plus gap */
-	width: calc(120px * 2 + 8px + 20px);
+	width: clamp(260px,28vw,320px);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 8px;
 	padding: 8px;
 	border-radius: 8px;
-	background: #fff;
+	background: #141824;
 	border: 1px solid rgba(0,0,0,0.04);
 	box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 	margin: 5px 0;
@@ -60,11 +60,54 @@
 	box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 	transform: none;
 }
-.tm-container{height:65vh;width:100%;background:var(--bg);display:flex;gap:12px}
-.tm-left{width:40%;min-width:320px;height:100%;border-radius: 8px;border-color: #000000;border-width: 2px;border-style: solid;overflow: hidden;}
+.tm-container{
+	height:65vh;
+	max-width:1200px; /* center the whole layout and limit its width */
+	margin:0 auto; /* equal whitespace left and right */
+	padding:0 16px; /* small horizontal padding on very small screens */
+	background:var(--bg);
+	display:flex;
+	gap:12px;
+	box-sizing:border-box;
+	justify-content: center; /* center children horizontally inside the container */
+}
+.tm-left{flex:0 0 40%;min-width:280px;height:100%;border-radius: 8px;overflow: hidden;box-shadow: 0 12px 36px rgba(2,6,23,0.65);position:relative}
 .tm-map{height:100%;width:100%;background:var(--bg);border-radius:6px}
-.tm-controls{flex:1;min-width:220px;padding:12px;border-radius: 8px;border-color: #000000;border-width: 2px;border-style: solid;overflow: hidden;}
-.tm-controls-title{font-weight:600;margin-bottom:8px}
+.tm-right{display:grid;grid-template-rows:auto 1fr;gap:12px;flex:0 0 auto;min-width:0;overflow:hidden;box-sizing:border-box;height:100%}
+.tm-telemetry{min-width:0;padding:10px 10px 4px 10px;border-radius: 8px;overflow:auto; background: #1a1f2e;box-shadow: 0 12px 36px rgba(2,6,23,0.65);width: max-content;max-width:48vw;box-sizing: border-box;display:flex;flex-direction:column;justify-self:start;align-self:stretch}
+
+/* On small screens make controls take full width below the map */
+@media (max-width: 900px) {
+	.tm-right { width: 100%; flex: 1 1 auto; }
+	.tm-playback { width: 100%; }
+	.tm-left { width: 100%; min-width: 0 }
+    .tm-telemetry { width: 100%; flex: 1 1 auto }
+}
+.tm-telemetry-title{font-weight:600;margin-bottom:8px;color:#ffffff}
+
+.tm-event-label{
+	font-size:13px;
+	color:#cfe3ff;
+	margin-top:0;
+	font-weight:600;
+}
+
+/* Top play/time/speed section inside controls */
+.tm-playback{
+	display:flex;
+	flex-direction:column;
+	gap:8px;
+	padding:8px 12px 6px 12px; /* smaller bottom padding so box sits tight under the time bar */
+	border-radius:8px;
+	background: #1a1f2e;
+	/* playback-specific accent color (independent from driver color) */
+	--play-color: #ffffff23; /* teal */
+	flex: 0 0 auto; /* fixed-size vertically, does not take remaining space */
+	width: max-content; /* match telemetry's shrink-wrapping width */
+	max-width: 48vw; /* keep same cap as telemetry */
+	box-sizing: border-box;
+	justify-self: start; /* align playback with telemetry on the left */
+}
 
 
 
@@ -72,7 +115,7 @@
 .tm-driver-chip{display:flex;align-items:center;gap:8px}
 .tm-driver-label{font-size:15px;color:#ffffff;margin-right:4px}
 .tm-driver-swatch{width:18px;height:18px;border-radius:3px;margin-left:8px;box-shadow:0 1px 2px rgba(0,0,0,0.12)}
-.tm-driver-select{appearance:none;padding:6px 10px;border-radius:8px;background:#f7fafb;border:1px solid rgba(0,0,0,0.06);font-weight:600;cursor:pointer}
+.tm-driver-select{appearance:none;padding:6px 10px;border-radius:8px;background:#141824;border:1px solid rgba(0,0,0,0.06);font-weight:600;cursor:pointer}
 .tm-driver-select:focus{outline:none;box-shadow:0 0 0 3px rgba(43,122,228,0.12)}
 
 /* wrapper to draw a custom arrow */
@@ -82,15 +125,51 @@
 
 
 
-.tm-controls-desc{font-size:13px;color:#333;margin-bottom:12px}
-.tm-button-primary{padding:8px 12px;border-radius:6px;background:#2b7ae4;color:white;border:none;cursor:pointer}
-.tm-telemetry-wrap{margin-top:12px;display:flex;flex-direction:column;gap:8px}
-.tm-metrics-row{display:flex;flex-wrap:wrap;gap:8px}
-.tm-metric-card{min-width:110px;flex:0 0 120px;padding:10px;border-radius:8px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tm-telemetry-desc{font-size:13px;color:#333;margin-bottom:12px}
+.tm-button-primary{padding:8px 12px;border-radius:6px;background:var(--driver-color, #3a17ff);color:white;border:none;cursor:pointer}
+.tm-refit-button{
+	position:absolute;
+	top:12px;
+	right:12px;
+	padding:6px 10px;
+	border-radius:6px;
+	background: rgba(255,255,255,0.04);
+	color: var(--fg, #e6eef8);
+	border: 1px solid rgba(255,255,255,0.03);
+	cursor: pointer;
+	z-index:600;
+	transition: background 120ms ease, transform 80ms ease;
+}
+.tm-refit-button:hover{background: rgba(255,255,255,0.06);transform:translateY(-1px)}
+.tm-telemetry-wrap{margin-top:8px;display:flex;flex-direction:column;gap:6px;flex:1}
+.tm-metrics-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+.tm-metric-card{min-width:130px;flex:0 0 150px;padding:8px;border-radius:8px;background:#141824;box-shadow:0 1px 2px rgba(0,0,0,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:78px}
 .tm-metric-label{font-size:12px;color:#666;text-align:center;margin-bottom:6px}
 .tm-metric-value{font-size:18px;font-weight:700;text-align:center;color:var(--driver-color, #3a17ff)}
 .tm-position-box{width:100%;padding:10px;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.06);color:var(--driver-color, #3a17ff);display:flex;align-items:center;justify-content:center;flex-direction:column}
-.tm-play-button{padding:6px 10px;border-radius:6px;background:#2b7ae4;color:white;border:none;cursor:pointer}
+.tm-play-button{
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 72px;
+	height: 34px;
+	padding: 0 12px;
+	border-radius: 6px;
+	background: var(--play-color, #ffb400);
+	color: white;
+	border: none;
+	cursor: pointer;
+	transition: background 120ms ease, box-shadow 120ms ease;
+	transform: none;
+}
+
+.tm-play-button:active {
+	transform: none;
+}
+.tm-play-button:focus {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(0,0,0,0.12);
+}
 .tm-range{
 	width:100%;
 	appearance:none;
@@ -99,6 +178,7 @@
 	background:#eef2f5;
 	outline:none;
 	cursor:pointer;
+	margin-bottom: 0; /* ensure range sits near the bottom of its container */
 }
 
 /* Webkit (Chrome, Edge, Safari) */
@@ -115,7 +195,7 @@
 	border-radius:50%;
 	background:#fff;
 	box-shadow:0 1px 2px rgba(0,0,0,0.18);
-	border:3px solid var(--driver-color, #3a17ff);
+ 	border:3px solid var(--play-color, #ffb400);
 }
 
 /* Firefox */
@@ -129,17 +209,17 @@
 	height:16px;
 	border-radius:50%;
 	background:#fff;
-	border:3px solid var(--driver-color, #3a17ff);
+ 	border:3px solid var(--play-color, #ffb400);
 	box-shadow:0 1px 2px rgba(0,0,0,0.18);
 }
 .tm-small{color:#666;font-size:12px;margin-top:6px}
-.tm-bar{height:12px;width:100%;background:#eef2f5;border-radius:0.5px;overflow:hidden;position:relative}
-.tm-bar-fill-throttle{background:linear-gradient(90deg,#3ac569,#2ea84a);height:100%;width:0%;transition:width 120ms linear}
-.tm-bar-fill-brake{background:linear-gradient(90deg,#ff6b6b,#ff3b3b);height:100%;width:0%;transition:width 120ms linear}
+.tm-bar{height:12px;width:100%;background:#1a1f2e;border-radius:0.5px;overflow:hidden;position:relative}
+.tm-bar-fill-throttle{background:#3ac569;height:100%;width:0%;transition:width 120ms linear}
+.tm-bar-fill-brake{background:#ff6b6b;height:100%;width:0%;transition:width 120ms linear}
 .tm-bar-label{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;color:#fff;font-weight:600;text-shadow:0 1px 0 rgba(0,0,0,0.25)}
 
 /* Vertical variant for throttle/brake meters */
 .tm-bar-vertical{width:28px;height:90px;border-radius:8px;padding:6px;box-sizing:border-box}
-.tm-bar-vertical .tm-bar-fill-throttle{background:linear-gradient(180deg,#2ea84a,#3ac569);width:100%;height:0%;position:absolute;left:0;bottom:0;transition:height 120ms linear;border-radius:6px}
-.tm-bar-vertical .tm-bar-fill-brake{background:linear-gradient(180deg,#ff3b3b,#ff6b6b);width:100%;height:0%;position:absolute;left:0;bottom:0;transition:height 120ms linear;border-radius:6px}
+.tm-bar-vertical .tm-bar-fill-throttle{background:#3ac569;width:100%;height:0%;position:absolute;left:0;bottom:0;transition:height 120ms linear;border-radius:6px}
+.tm-bar-vertical .tm-bar-fill-brake{background:#ff6b6b;width:100%;height:0%;position:absolute;left:0;bottom:0;transition:height 120ms linear;border-radius:6px}
 .tm-bar-vertical .tm-bar-label{left:50%;top:50%;transform:translate(-50%,-50%);right:auto}

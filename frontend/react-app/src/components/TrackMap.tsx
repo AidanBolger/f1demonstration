@@ -47,6 +47,8 @@ function FitBoundsGeo({ coords }: { coords: [number, number][] }) {
 
 export default function TrackMap({ corners, highResGeo }: { corners: Corners | null, highResGeo?: any }) {
   const mapRef = React.useRef<any | null>(null)
+  const playbackRef = React.useRef<HTMLDivElement | null>(null)
+  const telemetryRef = React.useRef<HTMLDivElement | null>(null)
   const cornerPoints = useMemo(() => {
     if (!corners) return [] as { x: number; y: number; idx: number; num?: number }[]
     const { X, Y, CornerNumber } = corners
@@ -198,7 +200,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
     const [speed, setSpeed] = React.useState(1) // 1x
 
     // Refs for high-performance animation (avoid stale closures)
-    const markerRef = React.useRef<L.Marker | null>(null)
+    const markerRef = React.useRef<L.CircleMarker | null>(null)
     const playStartWallRef = React.useRef<number | null>(null)
     const playStartTelRef = React.useRef<number | null>(null)
     const speedRef = React.useRef<number>(speed)
@@ -228,12 +230,19 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       if (!map || !telemetryLatLngs || telemetryLatLngs.length === 0) return
       // ensure we have a Leaflet map instance
       try {
+        const latlng = telemetryLatLngs[currentIndex]
         if (!markerRef.current) {
-          const latlng = telemetryLatLngs[currentIndex]
-          markerRef.current = L.marker([latlng[0], latlng[1]], { interactive: false }).addTo(map)
+          markerRef.current = L.circleMarker([latlng[0], latlng[1]], {
+            radius: 7,
+            color: '#ffffff', // white outline
+            weight: 2,
+            fillColor: driver?.color || '#3a17ff',
+            fillOpacity: 1,
+            interactive: false
+          }).addTo(map)
         } else {
-          const latlng = telemetryLatLngs[currentIndex]
           markerRef.current.setLatLng([latlng[0], latlng[1]])
+          try { markerRef.current.setStyle({ fillColor: driver?.color || '#3a17ff', color: '#ffffff' }) } catch (e) {}
         }
       } catch (e) {
         // ignore
@@ -245,6 +254,13 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
         }
       }
     }, [mapRef.current, telemetryLatLngs, currentIndex])
+
+    // Update marker style when the selected driver's color changes
+    React.useEffect(() => {
+      if (markerRef.current) {
+        try { markerRef.current.setStyle({ fillColor: driver?.color || '#3a17ff', color: '#ffffff' }) } catch (e) {}
+      }
+    }, [driver?.color])
 
     // main RAF loop: update marker position by telemetry time interpolation
     React.useEffect(() => {
@@ -341,6 +357,33 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return Math.round((currentIndex / Math.max(1, telemetry.time.length - 1)) * 100)
     }, [telemetry, currentIndex])
 
+    // Keep the playback box exactly the same pixel width as the telemetry box on desktop
+    React.useLayoutEffect(() => {
+      if (!playbackRef.current || !telemetryRef.current) return
+
+      const update = () => {
+        try {
+          // on small screens we want the media query to control full-width behavior
+          if (window.innerWidth <= 900) {
+            playbackRef.current!.style.width = ''
+            return
+          }
+          const w = telemetryRef.current!.offsetWidth
+          playbackRef.current!.style.width = w ? `${w}px` : ''
+        } catch (e) {}
+      }
+
+      update()
+      const ResizeObserverCtor = (window as any).ResizeObserver as any | undefined
+      const ro = ResizeObserverCtor ? new ResizeObserverCtor((entries: any) => update()) : null
+      if (telemetryRef.current && ro) ro.observe(telemetryRef.current)
+      window.addEventListener('resize', update)
+      return () => {
+        try { if (ro && telemetryRef.current) ro.unobserve(telemetryRef.current) } catch (e) {}
+        window.removeEventListener('resize', update)
+      }
+    }, [telemetryRef.current, playbackRef.current, telemetry, currentIndex])
+
 
   return (
     <div className="tm-container">
@@ -349,6 +392,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
         {!highResGeo || !highResGeo.features || !highResGeo.features.length ? (
           <div style={{ padding: 20 }}>No high-resolution GeoJSON track provided.</div>
         ) : (
+          <>
           <MapContainer
             ref={(m: any) => { mapRef.current = m }}
             center={[highResGeo.features[0].geometry.coordinates[0][1], highResGeo.features[0].geometry.coordinates[0][0]]}
@@ -367,21 +411,76 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
 
             {/* plotted corner circles (precomputed transform, or bbox fallback) */}
             {displayCorners.map((c, i) => (
-              <CircleMarker key={i} center={[c.lat, c.lon]} radius={5} pathOptions={{ color: '#d33', fillColor: '#d33' }}>
+              <CircleMarker key={i} center={[c.lat, c.lon]} radius={5} pathOptions={{ color: 'rgba(255, 255, 255, 1)', fillColor: 'rgba(255, 255, 255, 1)' }}>
                 <Tooltip>{c.num ?? `#${c.idx}`}</Tooltip>
               </CircleMarker>
             ))}
 
-          </MapContainer>
+            </MapContainer>
+
+            {/* Refit map button (moved out of controls) */}
+            <button
+              className="tm-refit-button"
+              title="Refit map (tight padding)"
+              onClick={() => {
+                try {
+                  if (!mapRef.current || !highResGeo || !highResGeo.features || !highResGeo.features.length) return
+                  const coords: [number, number][] = highResGeo.features[0].geometry.coordinates
+                  const latlngs = coords.map(c => L.latLng(c[1], c[0]))
+                  const bounds = L.latLngBounds(latlngs as any)
+                  setTimeout(() => mapRef.current.invalidateSize(), 0)
+                  mapRef.current.fitBounds(bounds, { padding: DEFAULT_PADDING })
+                } catch (e) {}
+              }}
+            >
+              Refit Map
+            </button>
+          </>
         )}
       </div>
 
-      {/* Right column: controls / info */}
-      <div className="tm-controls">
+
+      {/* Right column: playback on top, telemetry below */}
+      <div className="tm-right">
+        <div className="tm-playback" ref={playbackRef}>
+          <div className="tm-event-label">Circuit Gilles Villeneuve (Montreal) — 2025 Qualifying</div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <button onClick={() => setPlaying(p => !p)} className="tm-play-button">{playing ? 'Pause' : 'Play'}</button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <label style={{ fontSize: 15, color:'#cfe3ff' }}>Speed</label>
+              <div className="tm-driver-select-wrap">
+                <select className="tm-driver-select" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
+                  <option value={0.25}>0.25x</option>
+                  <option value={0.5}>0.5x</option>
+                  <option value={1}>1x</option>
+                  <option value={2}>2x</option>
+                  <option value={4}>4x</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {telemetry && telemetry.time && (
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, telemetry.time.length - 1)}
+              value={currentIndex}
+              onChange={e => { setCurrentIndex(Number(e.target.value)); setPlaying(false) }}
+              className="tm-range"
+              style={{
+                background: `linear-gradient(90deg, var(--play-color, #00bcd4) ${rangePercent}%, #141824 ${rangePercent}%)`
+              }}
+            />
+          )}
+        </div>
+
+      <div className="tm-telemetry" ref={telemetryRef} style={{ ['--driver-color' as any]: driver?.color || '#3a17ff' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div className="tm-controls-title">Track Controls</div>
+          
           <div className="tm-driver-chip">
-            <div className="tm-driver-label">Driver</div>
+            <div className="tm-driver-label" style={{ color: '#cfe3ff' }}>Driver</div>
             <div className="tm-driver-swatch" style={{ background: driver?.color || '#ccc' }} />
             <div className="tm-driver-select-wrap">
               <select
@@ -398,63 +497,9 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
           </div>
         </div>
 
-        {/* Telemetry controls */}
-        <div style={{ marginTop: 6 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-            {/* driver selector moved to header */}
+        
 
-
-            <button onClick={() => setPlaying(p => !p)} className="tm-play-button">{playing ? 'Pause' : 'Play'}</button>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <label style={{ fontSize: 15 }}>Speed</label>
-              <div className="tm-driver-select-wrap">
-                <select className="tm-driver-select" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
-                  <option value={0.25}>0.25x</option>
-                  <option value={0.5}>0.5x</option>
-                  <option value={1}>1x</option>
-                  <option value={2}>2x</option>
-                  <option value={4}>4x</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-            {telemetry && telemetry.time && (
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0, telemetry.time.length - 1)}
-              value={currentIndex}
-              onChange={e => { setCurrentIndex(Number(e.target.value)); setPlaying(false) }}
-              className="tm-range"
-              style={{
-                background: `linear-gradient(90deg, ${driver?.color || '#3a17ff'} ${rangePercent}%, #eef2f5 ${rangePercent}%)`,
-                accentColor: driver?.color || undefined,
-                ['--driver-color' as any]: driver?.color || '#3a17ff'
-              }}
-            />
-          )}
-        </div>
-
-        <div style={{ marginTop: 10 }}>
-          <button
-            onClick={() => {
-              // Refit using the tight default padding
-              try {
-                if (!mapRef.current || !highResGeo || !highResGeo.features || !highResGeo.features.length) return
-                const coords: [number, number][] = highResGeo.features[0].geometry.coordinates
-                const latlngs = coords.map(c => L.latLng(c[1], c[0]))
-                const bounds = L.latLngBounds(latlngs as any)
-                setTimeout(() => mapRef.current.invalidateSize(), 0)
-                mapRef.current.fitBounds(bounds, { padding: DEFAULT_PADDING })
-              } catch (e) {}
-            }}
-            title="Refit map (tight padding)"
-            className="tm-button-primary"
-          >
-            Refit Map
-          </button>
-        </div>
+        
 
         {/* Telemetry metrics as individual cards */}
         {telemetry && (
@@ -466,6 +511,12 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
               </div>
 
               <div className="tm-metric-card">
+                <div className="tm-metric-label">Distance</div>
+                <div className="tm-metric-value">{formatKm(telemetry.distance?.[currentIndex])}</div>
+              </div>
+            </div>
+            <div className="tm-metrics-row">
+              <div className="tm-metric-card">
                 <div className="tm-metric-label">Speed</div>
                 <div className="tm-metric-value">{String(roundDisplay(telemetry.speed?.[currentIndex]))} km/h</div>
               </div>
@@ -475,42 +526,6 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
                 <div className="tm-metric-value">{String(roundDisplay(telemetry.rpm?.[currentIndex]))}</div>
               </div>
 
-              {/* Gear metric removed from row — rendered as a full gear box below */}
-
-              <div className="tm-metric-card">
-                <div className="tm-metric-label">Throttle</div>
-                <div>
-                  {(() => {
-                    const pct = formatPercent(telemetry.throttle?.[currentIndex])
-                    return (
-                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
-                        <div className="tm-bar-fill-throttle" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
-                        {pct !== null && <div className="tm-bar-label">{pct}%</div>}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </div>
-
-              <div className="tm-metric-card">
-                <div className="tm-metric-label">Brake</div>
-                <div>
-                  {(() => {
-                    const pct = formatPercent(telemetry.brake?.[currentIndex])
-                    return (
-                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
-                        <div className="tm-bar-fill-brake" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
-                        {pct !== null && <div className="tm-bar-label">{pct}%</div>}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </div>
-
-              <div className="tm-metric-card">
-                <div className="tm-metric-label">Distance</div>
-                <div className="tm-metric-value">{formatKm(telemetry.distance?.[currentIndex])}</div>
-              </div>
             </div>
 
             {/* Gear box: fixed width (~two metric cards) with label above and horizontal gear row */}
@@ -541,11 +556,45 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
               </div>
             </div>
 
-            <div className="tm-metric-label" style={{ textAlign: 'left' }}>Position (X, Y)</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#3a17ffab" }}>{String(roundDisplay(telemetry.x?.[currentIndex]))}, {String(roundDisplay(telemetry.y?.[currentIndex]))}</div>
+            {/* Moved: Throttle and Brake metrics below the gearbox */}
+            <div className="tm-metrics-row" style={{ marginTop: 8 }}>
+              <div className="tm-metric-card">
+                <div className="tm-metric-label">Brake</div>
+                <div>
+                  {(() => {
+                    const pct = formatPercent(telemetry.brake?.[currentIndex])
+                    return (
+                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
+                        <div className="tm-bar-fill-brake" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
+                        {pct !== null && <div className="tm-bar-label">{pct}%</div>}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              <div className="tm-metric-card">
+                <div className="tm-metric-label">Throttle</div>
+                <div>
+                  {(() => {
+                    const pct = formatPercent(telemetry.throttle?.[currentIndex])
+                    return (
+                      <div className="tm-bar tm-bar-vertical" title={pct !== null ? `${pct}%` : 'n/a'}>
+                        <div className="tm-bar-fill-throttle" style={{ height: pct !== null ? `${pct}%` : '0%' }} />
+                        {pct !== null && <div className="tm-bar-label">{pct}%</div>}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* <div className="tm-metric-label" style={{ textAlign: 'left' }}>Position (X, Y)</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#2d2c33ab" }}>{String(roundDisplay(telemetry.x?.[currentIndex]))}, {String(roundDisplay(telemetry.y?.[currentIndex]))}</div> */}
 
           </div>
         )}
+        </div>
       </div>
     </div>
   )

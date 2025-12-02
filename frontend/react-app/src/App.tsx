@@ -1,5 +1,6 @@
 import React from 'react'
 import TrackMap from './components/TrackMap'
+import Navbar from './components/Navbar'
 
 // Import corners at build time so Vite bundles the data and the map can render synchronously.
 import cornersData from './data/corners.json'
@@ -16,12 +17,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <header style={{ padding: '1rem 2rem' }}>
-        <h1>F1 Demonstration — Track Viewer</h1>
-      </header>
-      <main style={{ padding: 12 }}>
-        <p>Displaying track from <code>corners.json</code></p>
-  <TrackMap corners={corners} highResGeo={caGeo} />
+      <Navbar />
+      <main className="app-main">
+        <TrackMap corners={corners} highResGeo={caGeo} />
       </main>
     </div>
   )
