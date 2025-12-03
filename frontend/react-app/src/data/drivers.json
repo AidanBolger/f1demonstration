@@ -1,9 +1,9 @@
 {
 	"drivers": [
-		{ "driver": "RUS", "team": "Mercedes", "color": "#C0C0C0" },
+		{ "driver": "RUS", "team": "Mercedes", "color": "#00D2BE" },
 		{ "driver": "VER", "team": "Red Bull Racing", "color": "#1E22AA" },
 		{ "driver": "PIA", "team": "McLaren", "color": "#FF8700" },
-		{ "driver": "ANT", "team": "Mercedes", "color": "#C0C0C0" },
+		{ "driver": "ANT", "team": "Mercedes", "color": "#00D2BE" },
 		{ "driver": "HAM", "team": "Ferrari", "color": "#FF2800" },
 		{ "driver": "ALO", "team": "Aston Martin", "color": "#005F3F" },
 		{ "driver": "NOR", "team": "McLaren", "color": "#FF8700" },

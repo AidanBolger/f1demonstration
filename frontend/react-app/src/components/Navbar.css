@@ -3,17 +3,34 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
+  /* very high z-index to ensure navbar stays above all other UI layers */
+  z-index: 2147483647;
   padding: 20px 28px;
   background: #1a1f2e;
   border-radius: 0;
   margin: 0;
   box-shadow: 0 10px 30px rgba(2,6,23,0.55);
 }
-.app-navbar-inner{display:flex;flex-direction:column;gap:6px}
+.app-navbar-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.app-title-block{display:flex;flex-direction:column}
 .app-title{font-size:24px;font-weight:800;color:var(--fg,#e6eef8)}
 .app-sub{font-size:15px;color:rgba(230,238,248,0.85)}
 
+.app-nav-links{display:flex;gap:12px;margin-top:0}
+.app-nav-link{color:var(--fg,#e6eef8);background:transparent;padding:6px 10px;border-radius:6px;text-decoration:none;font-weight:600}
+.app-nav-link:hover{background:rgba(255,255,255,0.03);transform:translateY(-1px)}
+
 @media(min-width:900px){
   .app-sub{font-size:16px}
+}
+
+/* On small screens stack title and nav */
+@media(max-width:900px){
+  .app-navbar-inner{flex-direction:column;align-items:flex-start}
+  .app-nav-links{margin-top:8px}
 }

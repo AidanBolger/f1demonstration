@@ -1,0 +1,51 @@
+# Repository-level .gitignore for f1demonstration
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Node.js
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build / caches
+dist/
+build/
+coverage/
+.cache/
+.vite/
+tsconfig.tsbuildinfo
+
+# Test / reporting
+coverage/
+.nyc_output/
+
+# Env / secrets
+.env
+.env.*
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Misc
+*.log
+*.tmp
+
+# NOTE: intentionally not ignoring lockfiles (package-lock.json, yarn.lock) and repo data files
+# so they remain tracked for reproducible installs and demos.

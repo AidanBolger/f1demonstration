@@ -11,9 +11,26 @@ import './TrackMap.css'
 // Explicit per-driver lap importers so we only load when user selects a driver.
 // This avoids Vite complaining about template dynamic imports while still not preloading other laps.
 const lapImporters: Record<string, () => Promise<any>> = {
-  VER: () => import('../data/laps/VER.json'),
+  ALB: () => import('../data/laps/ALB.json'),
+  ALO: () => import('../data/laps/ALO.json'),
+  ANT: () => import('../data/laps/ANT.json'),
+  BEA: () => import('../data/laps/BEA.json'),
+  BOR: () => import('../data/laps/BOR.json'),
+  COL: () => import('../data/laps/COL.json'),
+  GAS: () => import('../data/laps/GAS.json'),
+  HAD: () => import('../data/laps/HAD.json'),
   HAM: () => import('../data/laps/HAM.json'),
+  HUL: () => import('../data/laps/HUL.json'),
+  LAW: () => import('../data/laps/LAW.json'),
+  LEC: () => import('../data/laps/LEC.json'),
+  NOR: () => import('../data/laps/NOR.json'),
+  OCO: () => import('../data/laps/OCO.json'),
   PIA: () => import('../data/laps/PIA.json'),
+  RUS: () => import('../data/laps/RUS.json'),
+  SAI: () => import('../data/laps/SAI.json'),
+  STR: () => import('../data/laps/STR.json'),
+  TSU: () => import('../data/laps/TSU.json'),
+  VER: () => import('../data/laps/VER.json'),
 }
 
 // default padding used for fitBounds (tight)
@@ -45,7 +62,28 @@ function FitBoundsGeo({ coords }: { coords: [number, number][] }) {
   return null
 }
 
-export default function TrackMap({ corners, highResGeo }: { corners: Corners | null, highResGeo?: any }) {
+export default function TrackMap({
+  corners,
+  highResGeo,
+  selectedDriverCode: selectedDriverCodeProp,
+  onSelectDriver,
+  telemetry: telemetryProp,
+  telemetryLatLngs: telemetryLatLngsProp
+}: {
+  corners: Corners | null
+  highResGeo?: any
+  selectedDriverCode?: string
+  onSelectDriver?: (code: string) => void
+  telemetry?: any
+  telemetryLatLngs?: [number, number][]
+}) {
+  // allow either controlled (props) or uncontrolled (internal state) usage
+  const [internalSelectedDriverCode, setInternalSelectedDriverCode] = React.useState<string>('VER')
+  const selectedDriverCode = selectedDriverCodeProp ?? internalSelectedDriverCode
+  const setSelectedDriverCode = (code: string) => {
+    if (onSelectDriver) onSelectDriver(code)
+    else setInternalSelectedDriverCode(code)
+  }
   const mapRef = React.useRef<any | null>(null)
   const playbackRef = React.useRef<HTMLDivElement | null>(null)
   const telemetryRef = React.useRef<HTMLDivElement | null>(null)
@@ -130,11 +168,10 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return mappedCorners as DisplayCorner[]
     }, [precomputedMappedCorners, mappedCorners])
 
-    // --- Telemetry: support dynamic lap selection ---
-    const [selectedDriverCode, setSelectedDriverCode] = React.useState<string>('VER')
-    const [lapFilename, setLapFilename] = React.useState<string>('VER.json')
+    // --- Telemetry: support dynamic lap selection (controlled via props or internal) ---
+    const [lapFilename, setLapFilename] = React.useState<string>(`${selectedDriverCode}.json`)
     const [telemetryModule, setTelemetryModule] = React.useState<any | null>(null)
-    const telemetry = telemetryModule && telemetryModule.tel ? telemetryModule.tel : null
+    const telemetry = telemetryProp ?? (telemetryModule && telemetryModule.tel ? telemetryModule.tel : null)
 
     // Build a simple driver object for display/use in this component.
     const driversList: any[] = (driversData && (driversData as any).drivers) ? (driversData as any).drivers : []
@@ -143,6 +180,8 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
 
     // When a driver is selected, load that driver's lap via the explicit importer map.
     React.useEffect(() => {
+      // only perform dynamic import when telemetry is not provided via props
+      if (telemetryProp) return
       let cancelled = false
       const filename = `${selectedDriverCode}.json`
       setLapFilename(filename)
@@ -160,9 +199,9 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
         if (!cancelled) setTelemetryModule(null)
       })
       return () => { cancelled = true }
-    }, [selectedDriverCode])
+    }, [selectedDriverCode, telemetryProp])
 
-    const telemetryLatLngs = useMemo(() => {
+    const telemetryLatLngs = telemetryLatLngsProp ?? useMemo(() => {
       if (!telemetry || !telemetry.x || !telemetry.y) return [] as [number, number][]
       const xs: number[] = telemetry.x
       const ys: number[] = telemetry.y
@@ -224,7 +263,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
       return Math.max(0, Math.min(n - 2, lo - 1))
     }, [telemetry])
 
-    // create a raw Leaflet marker once when map and telemetry are ready
+    // Driver marker setup and update
     React.useEffect(() => {
       const map = mapRef.current
       if (!map || !telemetryLatLngs || telemetryLatLngs.length === 0) return
@@ -234,15 +273,15 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
         if (!markerRef.current) {
           markerRef.current = L.circleMarker([latlng[0], latlng[1]], {
             radius: 7,
-            color: '#ffffff', // white outline
-            weight: 2,
-            fillColor: driver?.color || '#3a17ff',
+            color: driver?.color || '#3a17ff', // stroke uses driver color
+            weight: 4,
+            fillColor: '#ffffff', // fill is white
             fillOpacity: 1,
             interactive: false
           }).addTo(map)
         } else {
           markerRef.current.setLatLng([latlng[0], latlng[1]])
-          try { markerRef.current.setStyle({ fillColor: driver?.color || '#3a17ff', color: '#ffffff' }) } catch (e) {}
+          try { markerRef.current.setStyle({ fillColor: '#ffffff', color: driver?.color || '#3a17ff' }) } catch (e) {}
         }
       } catch (e) {
         // ignore
@@ -258,7 +297,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
     // Update marker style when the selected driver's color changes
     React.useEffect(() => {
       if (markerRef.current) {
-        try { markerRef.current.setStyle({ fillColor: driver?.color || '#3a17ff', color: '#ffffff' }) } catch (e) {}
+        try { markerRef.current.setStyle({ fillColor: '#ffffff', color: driver?.color || '#3a17ff' }) } catch (e) {}
       }
     }, [driver?.color])
 
@@ -400,7 +439,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
             className="tm-map"
           >
             <FitBoundsGeo coords={highResGeo.features[0].geometry.coordinates as [number, number][]} />
-            <GeoJSON data={highResGeo} style={{ color: '#ffffffff', weight: 6, opacity: 0.95 }} />
+            <GeoJSON data={highResGeo} style={{ color: '#ffffff5b', weight: 6, opacity: 0.95 }} />
 
             {/* telemetry polyline */}
             {telemetryLatLngs && telemetryLatLngs.length > 0 && (
@@ -409,12 +448,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
 
             {/* playback marker is handled by a single raw Leaflet L.marker (markerRef) to avoid re-render jitter */}
 
-            {/* plotted corner circles (precomputed transform, or bbox fallback) */}
-            {displayCorners.map((c, i) => (
-              <CircleMarker key={i} center={[c.lat, c.lon]} radius={5} pathOptions={{ color: 'rgba(255, 255, 255, 1)', fillColor: 'rgba(255, 255, 255, 1)' }}>
-                <Tooltip>{c.num ?? `#${c.idx}`}</Tooltip>
-              </CircleMarker>
-            ))}
+            {/* corner display disabled for now */}
 
             </MapContainer>
 
@@ -450,7 +484,7 @@ export default function TrackMap({ corners, highResGeo }: { corners: Corners | n
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <label style={{ fontSize: 15, color:'#cfe3ff' }}>Speed</label>
               <div className="tm-driver-select-wrap">
-                <select className="tm-driver-select" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
+                <select className="tm-driver-select tm-speed-select" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
                   <option value={0.25}>0.25x</option>
                   <option value={0.5}>0.5x</option>
                   <option value={1}>1x</option>

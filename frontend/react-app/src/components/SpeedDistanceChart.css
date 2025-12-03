@@ -1,0 +1,17 @@
+.speed-distance-chart { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+.sd-bg { fill: #141824; stroke: none; rx: 6; }
+.sd-grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; stroke-dasharray: 0; }
+.sd-axis-label { fill: #cfe3ff; font-size:12px; text-anchor: middle}
+.sd-tick-label { fill: rgba(255,255,255,0.45); font-size:11px; }
+.sd-line { stroke: #ffb400; fill: none; }
+.sd-area { fill: #ffb400; }
+.sd-turn-line { stroke: rgba(255,255,255,0.12); stroke-dasharray: 4 4; }
+.sd-turn-dot { fill: #ff3b30; stroke: #fff; stroke-width: 0.8; }
+.sd-turn-label { fill: #fff; font-size:11px; font-weight:600; }
+
+/* hover styles */
+.sd-hover-line { stroke: rgba(255,255,255,0.18); stroke-width: 1; stroke-dasharray: 4 3; }
+.sd-hover-dot { fill: #fff; stroke: #ffb400; stroke-width: 1.2; }
+.sd-tooltip { position: absolute; pointer-events: none; background: rgba(6,18,38,0.95); color: #fff; padding: 6px 8px; border-radius: 6px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); font-size:12px; transform: translateY(-100%); }
+.sd-tooltip-value { font-weight:700; color: #ffb400; }
+.sd-tooltip-sub { font-size:11px; opacity:0.8 }
