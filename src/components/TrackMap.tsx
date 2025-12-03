@@ -32,8 +32,8 @@ const lapImporters: Record<string, () => Promise<any>> = {
   VER: () => import('../data/laps/VER.json'),
 }
 
-// Default fitBounds padding
-const DEFAULT_PADDING: [number, number] = [10, 10]
+// Default fitBounds padding (tight so the track fills more of the viewport)
+const DEFAULT_PADDING: [number, number] = [4, 4]
 
 type Corners = {
   CornerNumber: number[]
