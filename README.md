@@ -1,11 +1,11 @@
-# F1 Demonstration React App (moved)
+# F1TrackTelemetry
 
-This is the same Vite + React + TypeScript scaffold, now located at `f1demonstration/frontend/react-app`.
+This repository contains the F1TrackTelemetry React app (Vite + React + TypeScript).
 
 Quick commands:
 
 ```powershell
-cd "d:\personal projects\f1demonstration\frontend\react-app"
+cd "d:\personal projects\f1demonstration"
 npm install
 npm run dev
 ```
