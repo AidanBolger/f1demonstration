@@ -1,4 +1,5 @@
 # F1 Track Telemetry
+Deployed app - https://aidanbolger.github.io/f1TrackTelemetry/
 
 F1 Track Telemetry is a compact demo web app that visualizes per-lap Formula 1 telemetry alongside a high-resolution track preview. It combines a Leaflet map view of the circuit (GeoJSON) with per-sample telemetry playback (speed, throttle, brake, RPM, gear) and lightweight SVG-based analysis panels for quick visual inspection.
 
