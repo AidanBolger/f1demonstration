@@ -16,8 +16,8 @@ Where to find things:
 
 Data sources
 
-- Track GeoJSON (local): [frontend/react-app/src/data/ca-1978.geojson](https://github.com/bacinger/f1-circuits/tree/master)
-- Telemetry laps (local): [frontend/react-app/src/data/laps/](https://github.com/TracingInsights/2025) — includes sample laps such as `HAM.json`, `PIA.json`, and `VER.json`.
+- Track GeoJSON: (https://github.com/bacinger/f1-circuits/tree/master)
+- Telemetry laps: (https://github.com/TracingInsights/2025) — includes sample laps such as `HAM.json`, `PIA.json`, and `VER.json`.
 
 If you want these to point to original external sources (for example an OpenStreetMap extract, official timing data, or a published telemetry dataset), tell me the URLs and I will add them here with proper attribution. If you prefer, I can also add brief notes about licensing for each external source.
 
